@@ -2,9 +2,9 @@ name: Build SSC30KQ LTE Firmware
 
 on:
   push:
-    branches: [ main, lte-support ]
+    branches: [ master, lte-support ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -39,7 +39,7 @@ jobs:
           libncurses-dev u-boot-tools
 
     - name: Cache Buildroot downloads
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/buildroot_dl
         key: ${{ runner.os }}-buildroot-dl-${{ hashFiles('**/configs/*_defconfig') }}
@@ -47,7 +47,7 @@ jobs:
           ${{ runner.os }}-buildroot-dl-
 
     - name: Cache Buildroot build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           output/
@@ -204,7 +204,7 @@ jobs:
         EEOF
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ssc30kq-lte-firmware-${{ github.sha }}
         path: release/
