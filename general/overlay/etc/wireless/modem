@@ -75,4 +75,13 @@ if [ "$1" = "l716-t31-camhi" ]; then
 	exit 0
 fi
 
+# SSC30KQ with Huawei E3372h (using -J flag for direct switch)
+if [ "$1" = "e3372h-ssc30kq" ]; then
+	# No GPIO control needed - USB power is separate
+	usb_modeswitch -v 0x12d1 -p 0x1f01 -J
+	modprobe rndis_host
+	sleep 10
+	exit 0
+fi
+
 exit 1

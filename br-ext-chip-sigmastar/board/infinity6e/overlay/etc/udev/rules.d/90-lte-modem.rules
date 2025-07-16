@@ -1,0 +1,3 @@
+# Huawei E3372h LTE modem auto-initialization for SSC30KQ
+# When Huawei device in CD-ROM mode is detected, switch to modem mode
+SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ATTR{idProduct}=="1f01", RUN+="/etc/wireless/modem e3372h-ssc30kq"
