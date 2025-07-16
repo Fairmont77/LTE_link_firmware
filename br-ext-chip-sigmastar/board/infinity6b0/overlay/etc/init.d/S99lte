@@ -14,18 +14,26 @@ case "$1" in
     
     # Перемикаємо Huawei E3372h в NCM режим
     if [ -e /usr/bin/usb_modeswitch ]; then
-      usb_modeswitch -v 12d1 -p 1f01 -M "55534243123456780000000000000011063000000101000100000000000000"
+      echo "Switching Huawei E3372h to modem mode..."
+      # Використовуємо спеціальний Huawei режим
+      usb_modeswitch -v 12d1 -p 1f01 -H
+      # Альтернативно можна використати:
+      # usb_modeswitch -v 12d1 -p 1f01 -M "55534243123456780000000000000011063000000101000100000000000000"
     fi
     
     # Чекаємо на створення інтерфейсу
-    sleep 2
+    sleep 3
     
-    # Налаштовуємо мережу
-    if [ -e /sys/class/net/usb0 ]; then
-      echo "LTE modem detected, configuring network..."
-      ifconfig usb0 up
-      udhcpc -i usb0
-    fi
+    # Налаштовуємо мережу - перевіряємо різні можливі інтерфейси
+    for iface in usb0 wwan0 eth1 eth2; do
+      if [ -e /sys/class/net/$iface ]; then
+        echo "LTE interface $iface detected, configuring network..."
+        ifconfig $iface up
+        udhcpc -i $iface -b
+        echo "LTE modem configured on $iface"
+        break
+      fi
+    done
     ;;
   stop)
     echo "Disabling LTE modem..."

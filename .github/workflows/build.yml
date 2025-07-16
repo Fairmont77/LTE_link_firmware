@@ -82,6 +82,15 @@ jobs:
             ${{env.NANDFW}}
           retention-days: 30
 
+      - name: Show download info
+        if: github.event_name != 'pull_request' && env.NORFW
+        run: |
+          echo "✅ Build completed successfully!"
+          echo "📦 Firmware files:"
+          ls -la output/images/openipc*
+          echo ""
+          echo "🔽 Download artifacts from: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       # Telegram notification disabled - no tokens configured
       # - name: Send binary
       #   if: github.event_name != 'pull_request' && env.NORFW
