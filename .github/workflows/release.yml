@@ -186,107 +186,85 @@ jobs:
           echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.version.outputs.version }}
-        release_name: SSC30KQ LTE Firmware ${{ steps.version.outputs.version }}
-        body: |
-          # SSC30KQ LTE Firmware ${{ steps.version.outputs.version }}
-          
-          ## 🚀 Features
-          
-          ✅ **Huawei E3372h LTE Modem Support** - Automatic mode switching and connection  
-          ✅ **ZeroTier VPN** - Secure remote access over LTE  
-          ✅ **MSP OSD** - FPV telemetry overlay support  
-          ✅ **SER2NET** - Serial port over network functionality  
-          ✅ **IMX335 Spike5** - Optimized sensor configuration  
-          ✅ **16MB Flash** - Optimized for standard SSC30KQ boards  
-          
-          ## 📦 Installation
-          
-          1. Download `ssc30kq-lte-firmware-*.zip`
-          2. Extract the archive
-          3. Follow instructions in `firmware-info.txt`
-          4. Run `install.sh` script (Linux/macOS) or flash manually
-          
-          ## 🔧 Hardware Requirements
-          
-          - **Board**: SSC30KQ (Sigmastar infinity6e)
-          - **Sensor**: IMX335
-          - **Flash**: 16MB minimum
-          - **LTE Modem**: Huawei E3372h (USB)
-          
-          ## 📖 Quick Start
-          
-          After installation:
-          1. Connect Huawei E3372h USB modem
-          2. LTE connection establishes automatically
-          3. Setup ZeroTier network for remote access
-          4. Access camera via ZeroTier IP
-          
-          ## 🐛 Known Issues
-          
-          - First boot may take longer due to LTE initialization
-          - ZeroTier requires manual network configuration
-          
-          ## 🔗 Links
-          
-          - [Repository](https://github.com/Fairmont77/LTE_link_firmware)
-          - [Issues](https://github.com/Fairmont77/LTE_link_firmware/issues)
-          - [OpenIPC Project](https://openipc.org)
-          
-          ---
-          
-          **Build Info:**
-          - Commit: ${{ github.sha }}
-          - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          - Buildroot: 2024.02.10
-          - Kernel: infinity6e-next-2024.11.30
-        draft: false
-        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-
-    - name: Upload Firmware Package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release-files/ssc30kq-lte-firmware-${{ github.sha }}.zip
-        asset_name: ssc30kq-lte-firmware-${{ steps.version.outputs.version }}.zip
-        asset_content_type: application/zip
-
-    - name: Upload Individual Files
+    - name: Create Release Notes
       run: |
-        # Upload rootfs
-        curl \
-          -X POST \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Content-Type: application/octet-stream" \
-          --data-binary @release-files/rootfs.squashfs \
-          "${{ steps.create_release.outputs.upload_url }}?name=rootfs.squashfs"
+        cat > release-notes.md << 'EOF'
+        # SSC30KQ LTE Firmware ${{ steps.version.outputs.version }}
         
-        # Upload kernel
-        curl \
-          -X POST \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Content-Type: application/octet-stream" \
-          --data-binary @release-files/uImage \
-          "${{ steps.create_release.outputs.upload_url }}?name=uImage"
+        ## 🚀 Features
         
-        # Upload info file
-        curl \
-          -X POST \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Content-Type: text/plain" \
-          --data-binary @release-files/firmware-info.txt \
-          "${{ steps.create_release.outputs.upload_url }}?name=firmware-info.txt"
+        ✅ **Huawei E3372h LTE Modem Support** - Automatic mode switching and connection  
+        ✅ **ZeroTier VPN** - Secure remote access over LTE  
+        ✅ **MSP OSD** - FPV telemetry overlay support  
+        ✅ **SER2NET** - Serial port over network functionality  
+        ✅ **IMX335 Spike5** - Optimized sensor configuration  
+        ✅ **16MB Flash** - Optimized for standard SSC30KQ boards  
+        
+        ## 📦 Installation
+        
+        1. Download `ssc30kq-lte-firmware-*.zip`
+        2. Extract the archive
+        3. Follow instructions in `firmware-info.txt`
+        4. Run `install.sh` script (Linux/macOS) or flash manually
+        
+        ## 🔧 Hardware Requirements
+        
+        - **Board**: SSC30KQ (Sigmastar infinity6e)
+        - **Sensor**: IMX335
+        - **Flash**: 16MB minimum
+        - **LTE Modem**: Huawei E3372h (USB)
+        
+        ## 📖 Quick Start
+        
+        After installation:
+        1. Connect Huawei E3372h USB modem
+        2. LTE connection establishes automatically
+        3. Setup ZeroTier network for remote access
+        4. Access camera via ZeroTier IP
+        
+        ## 🐛 Known Issues
+        
+        - First boot may take longer due to LTE initialization
+        - ZeroTier requires manual network configuration
+        
+        ## 🔗 Links
+        
+        - [Repository](https://github.com/Fairmont77/LTE_link_firmware)
+        - [Issues](https://github.com/Fairmont77/LTE_link_firmware/issues)
+        - [OpenIPC Project](https://openipc.org)
+        
+        ---
+        
+        **Build Info:**
+        - Commit: ${{ github.sha }}
+        - Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Buildroot: 2024.02.10
+        - Kernel: infinity6e-next-2024.11.30
+        EOF
+
+    - name: Create Release and Upload Assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create release with GitHub CLI
+        PRERELEASE_FLAG=""
+        if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+        
+        echo "Creating release ${{ steps.version.outputs.version }}..."
+        gh release create "${{ steps.version.outputs.version }}" \
+          --title "SSC30KQ LTE Firmware ${{ steps.version.outputs.version }}" \
+          --notes-file release-notes.md \
+          $PRERELEASE_FLAG \
+          release-files/ssc30kq-lte-firmware-${{ github.sha }}.zip#"Firmware Package" \
+          release-files/rootfs.squashfs#"Root Filesystem" \
+          release-files/uImage#"Kernel Image" \
+          release-files/firmware-info.txt#"Installation Guide" \
+          release-files/install.sh#"Installation Script"
 
     - name: Notify completion
       run: |
         echo "🎉 Release created successfully!"
         echo "📦 Firmware package: ssc30kq-lte-firmware-${{ steps.version.outputs.version }}.zip"
-        echo "🔗 Release URL: ${{ steps.create_release.outputs.html_url }}"
+        echo "🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
