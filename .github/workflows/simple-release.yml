@@ -1,0 +1,84 @@
+name: Simple Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  simple-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Create simple release
+      run: |
+        echo "Creating simple release for SSC30KQ LTE firmware"
+        
+        # Create release info
+        mkdir -p release-files
+        cat > release-files/README.md << EOF
+        # SSC30KQ LTE Firmware ${{ github.event.inputs.version }}
+        
+        ## Features
+        - Huawei E3372h LTE modem support
+        - ZeroTier VPN for remote access  
+        - MSP OSD for telemetry
+        - IMX335 spike5 sensor config
+        - Optimized for 16MB flash
+        
+        ## Build Info
+        - Version: ${{ github.event.inputs.version }}
+        - Commit: ${{ github.sha }}
+        - Date: $(date -u)
+        
+        Note: This is a test release. Full firmware build coming soon.
+        EOF
+        
+        # Create a dummy firmware file
+        echo "SSC30KQ LTE Firmware placeholder" > release-files/firmware-placeholder.txt
+        
+        # Create ZIP
+        cd release-files
+        zip -r ssc30kq-lte-${{ github.event.inputs.version }}.zip *
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        release_name: SSC30KQ LTE Firmware ${{ github.event.inputs.version }}
+        body: |
+          # SSC30KQ LTE Firmware ${{ github.event.inputs.version }}
+          
+          ✅ Test release created successfully!
+          
+          ## Features
+          - Huawei E3372h LTE modem support
+          - ZeroTier VPN for remote access
+          - MSP OSD for FPV telemetry
+          - IMX335 spike5 sensor configuration
+          
+          This is a test release. Full firmware build workflow is being configured.
+          
+          Build: ${{ github.sha }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-files/ssc30kq-lte-${{ github.event.inputs.version }}.zip
+        asset_name: ssc30kq-lte-${{ github.event.inputs.version }}.zip
+        asset_content_type: application/zip

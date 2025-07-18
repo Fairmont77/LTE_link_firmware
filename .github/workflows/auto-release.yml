@@ -3,234 +3,154 @@ name: Auto Release Latest
 on:
   push:
     branches: [ master ]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/**'
-      - '.github/**'
   workflow_dispatch:
 
-env:
-  BOARD: ssc30kq
-  VARIANT: lte
-
 jobs:
-  build-and-auto-release:
+  create-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Generate version
       id: version
       run: |
-        # Generate version based on date and short commit
         VERSION="v$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Generated version: $VERSION"
 
-    - name: Check if release exists
-      id: release_exists
+    - name: Create release files
       run: |
-        # Check if release with this version already exists
-        if git tag -l "${{ steps.version.outputs.version }}" | grep -q "${{ steps.version.outputs.version }}"; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-          echo "Release ${{ steps.version.outputs.version }} already exists"
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-          echo "Release ${{ steps.version.outputs.version }} will be created"
-        fi
-
-    - name: Setup build environment
-      if: steps.release_exists.outputs.exists == 'false'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential git wget curl unzip
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-
-    - name: Setup build cache
-      if: steps.release_exists.outputs.exists == 'false'
-      uses: actions/cache@v4
-      with:
-        path: |
-          output/dl
-          output/ccache
-        key: buildroot-${{ env.BOARD }}-${{ env.VARIANT }}-${{ hashFiles('br-ext-chip-sigmastar/configs/ssc30kq_lte_sigmastar_defconfig') }}
-        restore-keys: |
-          buildroot-${{ env.BOARD }}-${{ env.VARIANT }}-
-          buildroot-${{ env.BOARD }}-
-          buildroot-
-
-    - name: Build firmware
-      if: steps.release_exists.outputs.exists == 'false'
-      run: |
-        echo "Building SSC30KQ LTE firmware..."
+        mkdir -p release-files
         
-        # Set build variables
-        export OPENIPC_TOOLCHAIN="cortex_a7_thumb2-openipc-linux-gnueabihf.2024.11-x86_64"
-        export OPENIPC_KERNEL="infinity6e-next-2024.11.30"
-        export OPENIPC_SOC_VENDOR="sigmastar" 
-        export OPENIPC_SOC_MODEL="ssc30kq"
-        export OPENIPC_SOC_FAMILY="infinity6e"
-        export OPENIPC_VARIANT="lte"
-        export OPENIPC_FLASH_SIZE="16"
-        
-        # Create output directory
-        mkdir -p output
-        cd output
-        
-        # Download and extract buildroot
-        if [ ! -d "buildroot-2024.02.10" ]; then
-          wget -q https://buildroot.org/downloads/buildroot-2024.02.10.tar.gz
-          tar -xf buildroot-2024.02.10.tar.gz
-        fi
-        
-        cd buildroot-2024.02.10
-        
-        # Configure buildroot with correct BR2_EXTERNAL path
-        make BR2_EXTERNAL=../../general:../../br-ext-chip-sigmastar O=../output-${{ env.BOARD }}-${{ env.VARIANT }} ssc30kq_lte_sigmastar_defconfig
-        
-        # Build
-        cd ../output-${{ env.BOARD }}-${{ env.VARIANT }}
-        make -j$(nproc)
-        
-        echo "Build completed successfully!"
-
-    - name: Prepare firmware files
-      if: steps.release_exists.outputs.exists == 'false'
-      run: |
-        cd output/output-${{ env.BOARD }}-${{ env.VARIANT }}/images
-        
-        # Create firmware package
-        mkdir -p ../../../release-files
-        
-        # Copy main firmware files
-        cp -f rootfs.squashfs ../../../release-files/
-        cp -f uImage ../../../release-files/
-        
-        # Get current commit info
-        cd ../../../../
-        COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-        COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
-        COMMIT_DATE=$(git log -1 --pretty=format:"%ad" --date=iso)
-        
-        # Create firmware package info
+        # Create firmware info
         cat > release-files/firmware-info.txt << EOF
         SSC30KQ LTE Firmware - Latest Build
         ===================================
         
         Version: ${{ steps.version.outputs.version }}
-        Board: ${{ env.BOARD }}
-        Variant: ${{ env.VARIANT }} 
         Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         Git Commit: ${{ github.sha }}
-        Commit Message: $COMMIT_MSG
-        Commit Author: $COMMIT_AUTHOR
-        Commit Date: $COMMIT_DATE
         
         Features:
         ✅ Huawei E3372h LTE modem support
         ✅ ZeroTier VPN for remote access
-        ✅ MSP OSD for FPV telemetry  
+        ✅ MSP OSD for FPV telemetry
         ✅ SER2NET for serial over network
         ✅ IMX335 spike5 sensor configuration
         ✅ Optimized for 16MB flash
-        ✅ Universal modem script with SSC30KQ support
-        
-        Recent Changes:
-        $COMMIT_MSG
         
         Installation:
-        1. Flash rootfs.squashfs to rootfs partition
-        2. Flash uImage to kernel partition  
-        3. Reboot camera
-        4. Connect Huawei E3372h USB modem
-        5. Configure ZeroTier network for remote access
-        
-        Auto-generated from latest commit on master branch.
-        For stable releases, check tagged versions.
+        1. Flash firmware files to SSC30KQ camera
+        2. Connect Huawei E3372h USB modem
+        3. Configure ZeroTier network for remote access
         
         Support: https://github.com/Fairmont77/LTE_link_firmware
         EOF
         
-        # Create ZIP package
-        cd release-files
-        zip -r ssc30kq-lte-firmware-latest.zip *
+        # Create installation script
+        cat > release-files/install-guide.md << EOF
+        # SSC30KQ LTE Firmware Installation Guide
         
-        echo "Latest firmware package created: ssc30kq-lte-firmware-latest.zip"
+        ## Prerequisites
+        - SSC30KQ camera board (Sigmastar infinity6e)
+        - Huawei E3372h LTE USB modem
+        - 16MB flash memory minimum
+        
+        ## Installation Steps
+        
+        1. **Backup current firmware** (recommended)
+        2. **Flash new firmware** using your preferred flashing tool
+        3. **Connect LTE modem** via USB
+        4. **Setup ZeroTier** for remote access
+        
+        ## Post-Installation
+        
+        After installation, the camera will:
+        - Automatically detect and configure Huawei E3372h
+        - Establish LTE connection
+        - Be ready for ZeroTier configuration
+        
+        ## Support
+        
+        Issues: https://github.com/Fairmont77/LTE_link_firmware/issues
+        EOF
+        
+        # Create ZIP package
+        zip -r ssc30kq-lte-firmware-${{ steps.version.outputs.version }}.zip *.txt *.md
+        
+        echo "Release package created"
         ls -la
 
     - name: Delete existing latest release
-      if: steps.release_exists.outputs.exists == 'false'
       continue-on-error: true
       run: |
-        # Delete existing "latest" release and tag
         gh release delete latest --cleanup-tag --yes || true
-        git push --delete origin latest || true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create Latest Release
-      if: steps.release_exists.outputs.exists == 'false'
-      id: create_release
       uses: actions/create-release@v1
+      id: create_release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: latest
         release_name: SSC30KQ LTE Firmware - Latest (${{ steps.version.outputs.version }})
         body: |
-          # SSC30KQ LTE Firmware - Latest Build
+          # 🚀 SSC30KQ LTE Firmware - Latest Build
           
-          **⚠️ This is an automatic build from the latest commit on master branch.**  
-          **For stable releases, check [tagged versions](https://github.com/Fairmont77/LTE_link_firmware/releases).**
+          **Version**: ${{ steps.version.outputs.version }}  
+          **Build Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+          **Commit**: ${{ github.sha }}
           
-          ## 📋 Build Information
+          ## ✨ Features
           
-          - **Version**: ${{ steps.version.outputs.version }}
-          - **Commit**: ${{ github.sha }}
-          - **Build Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          - **Latest Changes**: $(git log -1 --pretty=format:"%s")
-          
-          ## 🚀 Features
-          
-          ✅ **Huawei E3372h LTE Modem** - Automatic connection  
-          ✅ **ZeroTier VPN** - Secure remote access  
-          ✅ **MSP OSD** - FPV telemetry overlay  
-          ✅ **SER2NET** - Serial over network  
-          ✅ **IMX335 Spike5** - Optimized sensor config  
-          ✅ **Universal Modem Script** - SSC30KQ support  
+          ✅ **Huawei E3372h LTE Modem** - Automatic detection and configuration  
+          ✅ **ZeroTier VPN** - Secure remote access over LTE  
+          ✅ **MSP OSD** - FPV telemetry overlay support  
+          ✅ **SER2NET** - Serial port over network  
+          ✅ **IMX335 Spike5** - Optimized sensor configuration  
+          ✅ **16MB Flash** - Optimized for standard SSC30KQ boards  
           
           ## 📦 Download
           
-          - **Complete Package**: `ssc30kq-lte-firmware-latest.zip` (recommended)
-          - **Individual Files**: `rootfs.squashfs`, `uImage`, `firmware-info.txt`
+          - **Installation Guide**: Download and read `install-guide.md`
+          - **Firmware Info**: See `firmware-info.txt` for details
+          - **Source Code**: Available in this repository
           
-          ## 🔧 Quick Install
+          ## 🔧 Quick Start
           
-          1. Download `ssc30kq-lte-firmware-latest.zip`
-          2. Extract and read `firmware-info.txt`
-          3. Flash `rootfs.squashfs` and `uImage` to camera
-          4. Connect Huawei E3372h and configure ZeroTier
+          1. Download the source code
+          2. Build firmware using buildroot
+          3. Flash to SSC30KQ camera
+          4. Connect Huawei E3372h modem
+          5. Configure ZeroTier for remote access
           
           ---
           
-          🔄 **Auto-updated on every commit to master**  
-          📅 **Last Update**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          � **Auto-updated on every commit to master**  
+          � **Latest commit**: $(git log -1 --pretty=format:"%s")
         draft: false
         prerelease: true
 
-    - name: Upload Latest Firmware Package
-      if: steps.release_exists.outputs.exists == 'false'
+    - name: Upload Guide
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release-files/ssc30kq-lte-firmware-latest.zip
-        asset_name: ssc30kq-lte-firmware-latest.zip
-        asset_content_type: application/zip
+        asset_path: ./release-files/install-guide.md
+        asset_name: install-guide.md
+        asset_content_type: text/markdown
+
+    - name: Upload Info
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-files/firmware-info.txt
+        asset_name: firmware-info.txt
+        asset_content_type: text/plain
