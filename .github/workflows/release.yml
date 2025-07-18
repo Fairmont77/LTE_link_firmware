@@ -75,8 +75,8 @@ jobs:
         
         cd buildroot-2024.02.10
         
-        # Configure buildroot
-        make BR2_EXTERNAL=../../ O=../output-${{ env.BOARD }}-${{ env.VARIANT }} ssc30kq_lte_sigmastar_defconfig
+        # Configure buildroot with correct BR2_EXTERNAL path
+        make BR2_EXTERNAL=../../general:../../br-ext-chip-sigmastar O=../output-${{ env.BOARD }}-${{ env.VARIANT }} ssc30kq_lte_sigmastar_defconfig
         
         # Build
         cd ../output-${{ env.BOARD }}-${{ env.VARIANT }}
