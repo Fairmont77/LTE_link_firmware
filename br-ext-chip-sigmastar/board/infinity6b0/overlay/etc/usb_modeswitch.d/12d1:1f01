@@ -1,0 +1,11 @@
+# Huawei E3372h configuration
+# Original mode: 12d1:1f01 (CD-ROM mode)
+# Target mode: 12d1:14db (NCM/modem mode)
+
+DefaultVendor=0x12d1
+DefaultProduct=0x1f01
+
+TargetVendor=0x12d1
+TargetProduct=0x14db
+
+HuaweiMode=1

@@ -1,0 +1,47 @@
+#!/bin/sh
+
+case "$1" in
+  start)
+    echo "Enabling USB power for LTE modem..."
+    
+    # Увімкнення GPIO 10 для USB живлення (для SSC30KQ)
+    echo 10 > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio10/direction
+    echo 1 > /sys/class/gpio/gpio10/value
+    
+    # Чекаємо на появу модема
+    sleep 3
+    
+    # Перемикаємо Huawei E3372h в NCM режим
+    if [ -e /usr/bin/usb_modeswitch ]; then
+      echo "Switching Huawei E3372h to modem mode..."
+      # Використовуємо спеціальний Huawei режим
+      usb_modeswitch -v 12d1 -p 1f01 -H
+      # Альтернативно можна використати:
+      # usb_modeswitch -v 12d1 -p 1f01 -M "55534243123456780000000000000011063000000101000100000000000000"
+    fi
+    
+    # Чекаємо на створення інтерфейсу
+    sleep 3
+    
+    # Налаштовуємо мережу - перевіряємо різні можливі інтерфейси
+    for iface in usb0 wwan0 eth1 eth2; do
+      if [ -e /sys/class/net/$iface ]; then
+        echo "LTE interface $iface detected, configuring network..."
+        ifconfig $iface up
+        udhcpc -i $iface -b
+        echo "LTE modem configured on $iface"
+        break
+      fi
+    done
+    ;;
+  stop)
+    echo "Disabling LTE modem..."
+    echo 0 > /sys/class/gpio/gpio10/value
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+esac
+
+exit 0
